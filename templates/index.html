@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MiDaS AI | Advanced Depth Estimation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+            background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* Upload Area */
+        .upload-section {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 3rem;
+            text-align: center;
+            margin-bottom: 4rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-section:hover {
+            border-color: var(--primary);
+            box-shadow: 0 0 40px rgba(99, 102, 241, 0.2);
+            transform: translateY(-4px);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 1.5rem;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: scale(1.05);
+        }
+
+        /* Gallery */
+        .gallery-title {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: transform 0.3s;
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        .card:hover {
+            transform: scale(1.02);
+        }
+
+        .card-images {
+            position: relative;
+            aspect-ratio: 16/10;
+            display: flex;
+        }
+
+        .card-images img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.3s;
+        }
+
+        .depth-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .card:hover .depth-overlay {
+            opacity: 1;
+        }
+
+        .card-info {
+            padding: 1.2rem;
+        }
+
+        .card-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .card-meta {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Processing Modal */
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 5px solid var(--glass-border);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+
+        .tab-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-muted);
+            padding: 0.8rem 2rem;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .live-container {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .live-video-wrapper {
+            position: relative;
+            margin-top: 2rem;
+            background: #000;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 2px solid var(--glass-border);
+        }
+
+        .calibration-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            border: 1px solid var(--glass-border);
+            text-align: left;
+        }
+
+        .panel-header {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .control-group input {
+            flex-grow: 1;
+            accent-color: var(--primary);
+        }
+
+        .help-text {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>MiDaS AI</h1>
+            <p class="subtitle">State-of-the-art Monocular Depth Estimation</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('gallery')">📂 Gallery & Upload</button>
+            <button class="tab-btn" onclick="showTab('live')">🔴 Live AI Camera</button>
+        </div>
+
+        <section id="gallery-tab">
+            <section class="upload-section" onclick="document.getElementById('file-input').click()">
+                <span class="upload-icon">🚀</span>
+                <h3>Upload Image to Process</h3>
+                <p class="subtitle">Drag & drop or click to select a photo (PNG, JPG)</p>
+                <input type="file" id="file-input" accept="image/*">
+                <button class="btn-primary">Select Photo</button>
+            </section>
+
+            <section id="gallery-section">
+                <h2 class="gallery-title">
+                    <span>📂</span> Processed Results
+                </h2>
+                <div class="gallery-grid" id="gallery-grid">
+                    <!-- Gallery items will be injected here -->
+                </div>
+            </section>
+        </section>
+
+        <section id="live-tab" style="display: none;">
+            <div class="live-container">
+                <div class="live-header">
+                    <h2 class="gallery-title"><span>🔴</span> Live AI Distance</h2>
+                    <p class="subtitle">Real-time distance estimation in centimeters</p>
+                </div>
+                
+                <div class="live-video-wrapper">
+                    <img id="live-feed" src="" alt="Live Feed" style="width: 100%; border-radius: 20px;">
+                    <div class="live-controls">
+                        <button class="btn-primary" id="toggle-live">Start Live Stream</button>
+                    </div>
+                </div>
+
+                <div class="calibration-panel">
+                    <div class="panel-header">🔊 Proximity Alert System</div>
+                    <div class="control-group">
+                        <label>Enable Beep Alert:</label>
+                        <input type="checkbox" id="beep-toggle" style="width: auto;">
+                    </div>
+                    <div class="control-group">
+                        <label>Sensitivity (Higher = Needs to be closer):</label>
+                        <input type="range" id="sensitivity" min="0.1" max="0.95" step="0.05" value="0.8">
+                        <span id="sensitivity-val">0.80</span>
+                    </div>
+                    <p class="help-text">When the center depth exceeds this value, a beep will sound.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div id="loading-overlay">
+        <div class="loader"></div>
+        <h2>Analyzing Depth...</h2>
+        <p class="subtitle">Generating relative depth map using MiDaS v2.1</p>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const galleryGrid = document.getElementById('gallery-grid');
+        const liveFeed = document.getElementById('live-feed');
+        const toggleLiveBtn = document.getElementById('toggle-live');
+        const beepToggle = document.getElementById('beep-toggle');
+        const sensitivityInput = document.getElementById('sensitivity');
+        const sensitivityVal = document.getElementById('sensitivity-val');
+        
+        let isLive = false;
+        let audioCtx = null;
+        let proximityInterval = null;
+        let liveMode = 'server'; 
+
+        // Audio Synthesis Function
+        function playBeep(frequency = 440, duration = 0.1) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+            
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + duration);
+        }
+
+        sensitivityInput.addEventListener('input', (e) => {
+            sensitivityVal.innerText = parseFloat(e.target.value).toFixed(2);
+        });
+
+        function showTab(tab) {
+            document.getElementById('gallery-tab').style.display = tab === 'gallery' ? 'block' : 'none';
+            document.getElementById('live-tab').style.display = tab === 'live' ? 'block' : 'none';
+            
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.innerText.toLowerCase().includes(tab));
+            });
+
+            if (tab !== 'live' && isLive) {
+                stopLive();
+            }
+        }
+
+        toggleLiveBtn.addEventListener('click', () => {
+            if (!isLive) {
+                startLive();
+            } else {
+                stopLive();
+            }
+        });
+
+        async function startLive() {
+            isLive = true;
+            toggleLiveBtn.innerText = 'Stop Live Stream';
+            toggleLiveBtn.style.background = '#ef4444';
+
+            try {
+                // 1. Try Browser Camera (Required for Render/Cloud)
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
+                liveMode = 'browser';
+                
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                await video.play();
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = 480;
+                canvas.height = 360;
+                const ctx = canvas.getContext('2d');
+
+                const captureLoop = async () => {
+                    if (!isLive) {
+                        stream.getTracks().forEach(t => t.stop());
+                        return;
+                    }
+                    
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob(async (blob) => {
+                        const formData = new FormData();
+                        formData.append('image', blob, 'frame.jpg');
+                        
+                        try {
+                            const res = await fetch('/api/process_frame', { method: 'POST', body: formData });
+                            if (!res.ok) throw new Error("Processing error");
+                            const data = await res.json();
+                            
+                            if (data.image) {
+                                liveFeed.src = `data:image/jpeg;base64,${data.image}`;
+                                const threshold = parseFloat(sensitivityInput.value);
+                                if (beepToggle.checked && data.depth > threshold) {
+                                    playBeep(880, 0.15);
+                                }
+                            }
+                        } catch (e) { 
+                            console.error("Frame processing failed", e);
+                        }
+                        
+                        if (isLive) setTimeout(captureLoop, 150); // Control FPS
+                    }, 'image/jpeg', 0.6);
+                };
+                captureLoop();
+
+            } catch (err) {
+                console.log("Browser camera unavailable, falling back to server capture (Local Dev only)");
+                liveMode = 'server';
+                liveFeed.src = '/video_feed';
+
+                // Start Proximity Polling (Only for server mode)
+                proximityInterval = setInterval(async () => {
+                    if (!isLive) return;
+                    try {
+                        const response = await fetch('/api/proximity');
+                        const data = await response.json();
+                        const threshold = parseFloat(sensitivityInput.value);
+                        
+                        if (beepToggle.checked && data.depth > threshold) {
+                            playBeep(880, 0.15);
+                        }
+                    } catch (e) {
+                        console.error("Proximity fetch error", e);
+                    }
+                }, 300);
+            }
+        }
+
+        function stopLive() {
+            liveFeed.src = '';
+            toggleLiveBtn.innerText = 'Start Live Stream';
+            toggleLiveBtn.style.background = 'var(--primary)';
+            isLive = false;
+            
+            if (proximityInterval) {
+                clearInterval(proximityInterval);
+                proximityInterval = null;
+            }
+        }
+
+        // Handle File Selection
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                await uploadFile(file);
+            }
+        });
+
+        // Upload and Process
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            loadingOverlay.style.display = 'flex';
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    loadGallery(); // Refresh gallery
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (err) {
+                alert('Connection error');
+            } finally {
+                loadingOverlay.style.display = 'none';
+                fileInput.value = ''; // Reset input
+            }
+        }
+
+        // Load Gallery
+        async function loadGallery() {
+            try {
+                const response = await fetch('/api/gallery');
+                const images = await response.json();
+                
+                galleryGrid.innerHTML = '';
+                
+                images.forEach(item => {
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <div class="card-images">
+                            <img src="/uploads/${item.original}" alt="Original">
+                            <img src="/outputs/${item.depth}" class="depth-overlay" alt="Depth Map">
+                            <span class="comparison-label">Hover to see depth</span>
+                        </div>
+                        <div class="card-info">
+                            <div class="card-name">${item.original}</div>
+                            <div class="card-meta">Processed with MiDaS v2.1 Small</div>
+                        </div>
+                    `;
+                    galleryGrid.appendChild(card);
+                });
+            } catch (err) {
+                console.error('Failed to load gallery', err);
+            }
+        }
+
+        // Initial Load
+        loadGallery();
+
+        // Drag and Drop Support
+        const dropZone = document.querySelector('.upload-section');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--primary)', false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.style.borderColor = 'var(--glass-border)', false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+
+    </script>
+</body>
+</html>
