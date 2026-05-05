@@ -7,6 +7,11 @@ from flask import Flask, render_template, Response, send_from_directory, request
 import run 
 from supabase import create_client, Client
 
+# Optimization for Low-RAM environments (Render Free Tier)
+torch.set_num_threads(1)
+if hasattr(torch, 'set_num_interop_threads'):
+    torch.set_num_interop_threads(1)
+
 app = Flask(__name__)
 
 # Minimal Setup
@@ -22,8 +27,13 @@ os.makedirs("weights", exist_ok=True)
 # Supabase Configuration
 SUPABASE_URL = "https://coqhpheamglomgbygkfu.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvcWhwaGVhbWdsb21nYnlna2Z1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM2NzYwNywiZXhwIjoyMDg3OTQzNjA3fQ.8tqVEltmU3MFgdagq7aVgQKlYC8zNcnU-5xutMAc9z0"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 BUCKET_NAME = "3d_mapps"
+
+supabase = None
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    print(f"Supabase init warning: {e}")
 
 def download_weights():
     if not os.path.exists(WEIGHTS_PATH):
@@ -56,6 +66,9 @@ def get_live_model():
 
 @app.route('/')
 def index(): return render_template('index.html')
+
+@app.route('/health')
+def health(): return jsonify({"status": "ok", "memory": "low-ram-mode"})
 
 @app.route('/uploads/<path:f>')
 def serve_u(f): return send_from_directory(UPLOAD_FOLDER, f)
