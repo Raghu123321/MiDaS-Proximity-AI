@@ -6,3 +6,5 @@ numpy
 gunicorn
 timm
 requests
+imutils
+einops
