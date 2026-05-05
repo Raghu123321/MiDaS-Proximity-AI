@@ -566,12 +566,12 @@
                     card.className = 'card';
                     card.innerHTML = `
                         <div class="card-images">
-                            <img src="/uploads/${item.original}" alt="Original">
-                            <img src="/outputs/${item.depth}" class="depth-overlay" alt="Depth Map">
+                            <img src="${item.original}" alt="Original">
+                            <img src="${item.depth}" class="depth-overlay" alt="Depth Map">
                             <span class="comparison-label">Hover to see depth</span>
                         </div>
                         <div class="card-info">
-                            <div class="card-name">${item.original}</div>
+                            <div class="card-name">${item.name}</div>
                             <div class="card-meta">Processed with MiDaS v2.1 Small</div>
                         </div>
                     `;

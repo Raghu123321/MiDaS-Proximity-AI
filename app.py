@@ -5,6 +5,7 @@ import torch
 import requests
 from flask import Flask, render_template, Response, send_from_directory, request, jsonify
 import run 
+from supabase import create_client, Client
 
 app = Flask(__name__)
 
@@ -17,6 +18,12 @@ WEIGHTS_URL = "https://github.com/isl-org/MiDaS/releases/download/v2_1/midas_v21
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 os.makedirs("weights", exist_ok=True)
+
+# Supabase Configuration
+SUPABASE_URL = "https://coqhpheamglomgbygkfu.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvcWhwaGVhbWdsb21nYnlna2Z1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MjM2NzYwNywiZXhwIjoyMDg3OTQzNjA3fQ.8tqVEltmU3MFgdagq7aVgQKlYC8zNcnU-5xutMAc9z0"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+BUCKET_NAME = "3d_mapps"
 
 def download_weights():
     if not os.path.exists(WEIGHTS_PATH):
@@ -68,9 +75,17 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
     
-    # Save original
+    # Save original locally
     original_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(original_path)
+    
+    # Upload to Supabase Storage
+    with open(original_path, "rb") as f:
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path=f"originals/{file.filename}",
+            file=f,
+            file_options={"upsert": "true"}
+        )
     
     # Process
     model, transform = get_live_model()
@@ -80,25 +95,46 @@ def upload_file():
     
     _, depth_vis = process_single_frame(frame, model, transform)
     
-    # Save depth
+    # Save depth locally
     depth_filename = "depth_" + file.filename
     depth_path = os.path.join(OUTPUT_FOLDER, depth_filename)
     cv2.imwrite(depth_path, depth_vis)
+
+    # Upload to Supabase Storage
+    with open(depth_path, "rb") as f:
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path=f"outputs/{depth_filename}",
+            file=f,
+            file_options={"upsert": "true"}
+        )
+
+    # Save Metadata to Supabase Database
+    original_url = supabase.storage.from_(BUCKET_NAME).get_public_url(f"originals/{file.filename}")
+    depth_url = supabase.storage.from_(BUCKET_NAME).get_public_url(f"outputs/{depth_filename}")
     
-    return jsonify({"success": True, "original": file.filename, "depth": depth_filename})
+    supabase.table("gallery").insert({
+        "original_name": file.filename,
+        "original_url": original_url,
+        "depth_url": depth_url,
+        "depth_score": float(depth_score)
+    }).execute()
+    
+    return jsonify({"success": True, "original": original_url, "depth": depth_url})
 
 @app.route('/api/gallery')
 def get_gallery():
     try:
-        files = os.listdir(OUTPUT_FOLDER)
+        response = supabase.table("gallery").select("*").order("created_at", desc=True).execute()
         gallery = []
-        for f in files:
-            if f.startswith("depth_"):
-                original = f.replace("depth_", "")
-                if os.path.exists(os.path.join(UPLOAD_FOLDER, original)):
-                    gallery.append({"original": original, "depth": f})
-        return jsonify(gallery[::-1]) # Show latest first
+        for row in response.data:
+            gallery.append({
+                "original": row["original_url"],
+                "depth": row["depth_url"],
+                "name": row["original_name"]
+            })
+        return jsonify(gallery)
     except Exception as e:
+        print(f"Gallery fetch error: {e}")
         return jsonify([])
 
 def process_single_frame(frame, model, transform):

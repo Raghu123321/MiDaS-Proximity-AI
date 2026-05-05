@@ -8,3 +8,4 @@ timm
 requests
 imutils
 einops
+supabase
