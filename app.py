@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 import torch
@@ -94,13 +95,19 @@ def upload_file():
     original_path = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(original_path)
     
-    # Upload to Supabase Storage
-    with open(original_path, "rb") as f:
-        supabase.storage.from_(BUCKET_NAME).upload(
-            path=f"originals/{file.filename}",
-            file=f,
-            file_options={"upsert": "true"}
-        )
+    # Upload to Supabase Storage if available
+    original_url = f"/uploads/{file.filename}"
+    if supabase:
+        try:
+            with open(original_path, "rb") as f:
+                supabase.storage.from_(BUCKET_NAME).upload(
+                    path=f"originals/{file.filename}",
+                    file=f,
+                    file_options={"upsert": "true"}
+                )
+            original_url = supabase.storage.from_(BUCKET_NAME).get_public_url(f"originals/{file.filename}")
+        except Exception as e:
+            print(f"Supabase upload error (original): {e}")
     
     # Process
     model, transform = get_live_model()
@@ -108,37 +115,42 @@ def upload_file():
     if frame is None:
         return jsonify({"error": "Invalid image format"}), 400
     
-    _, depth_vis = process_single_frame(frame, model, transform)
+    depth_score, depth_vis = process_single_frame(frame, model, transform)
     
     # Save depth locally
     depth_filename = "depth_" + file.filename
     depth_path = os.path.join(OUTPUT_FOLDER, depth_filename)
     cv2.imwrite(depth_path, depth_vis)
 
-    # Upload to Supabase Storage
-    with open(depth_path, "rb") as f:
-        supabase.storage.from_(BUCKET_NAME).upload(
-            path=f"outputs/{depth_filename}",
-            file=f,
-            file_options={"upsert": "true"}
-        )
-
-    # Save Metadata to Supabase Database
-    original_url = supabase.storage.from_(BUCKET_NAME).get_public_url(f"originals/{file.filename}")
-    depth_url = supabase.storage.from_(BUCKET_NAME).get_public_url(f"outputs/{depth_filename}")
-    
-    supabase.table("gallery").insert({
-        "original_name": file.filename,
-        "original_url": original_url,
-        "depth_url": depth_url,
-        "depth_score": float(depth_score)
-    }).execute()
+    # Upload to Supabase Storage if available
+    depth_url = f"/outputs/{depth_filename}"
+    if supabase:
+        try:
+            with open(depth_path, "rb") as f:
+                supabase.storage.from_(BUCKET_NAME).upload(
+                    path=f"outputs/{depth_filename}",
+                    file=f,
+                    file_options={"upsert": "true"}
+                )
+            depth_url = supabase.storage.from_(BUCKET_NAME).get_public_url(f"outputs/{depth_filename}")
+            
+            # Save Metadata to Supabase Database
+            supabase.table("gallery").insert({
+                "original_name": file.filename,
+                "original_url": original_url,
+                "depth_url": depth_url,
+                "depth_score": float(depth_score)
+            }).execute()
+        except Exception as e:
+            print(f"Supabase upload/DB error: {e}")
     
     return jsonify({"success": True, "original": original_url, "depth": depth_url})
 
 @app.route('/api/gallery')
 def get_gallery():
     try:
+        if not supabase:
+            return jsonify([])
         response = supabase.table("gallery").select("*").order("created_at", desc=True).execute()
         gallery = []
         for row in response.data:
