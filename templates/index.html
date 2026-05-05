@@ -431,6 +431,7 @@
             toggleLiveBtn.innerText = 'Stop Live Stream';
             toggleLiveBtn.style.background = '#ef4444';
 
+            try {
                 toggleLiveBtn.innerText = '🎥 Connecting Camera...';
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { width: { ideal: 480 }, height: { ideal: 360 } } 
@@ -475,7 +476,7 @@
                             console.error("Frame processing failed", e);
                         }
                         
-                        if (isLive) setTimeout(captureLoop, 150); // Control FPS
+                        if (isLive) setTimeout(captureLoop, 150);
                     }, 'image/jpeg', 0.6);
                 };
                 captureLoop();
@@ -488,7 +489,6 @@
                 liveMode = 'server';
                 liveFeed.src = '/video_feed';
 
-                // Start Proximity Polling (Only for server mode)
                 proximityInterval = setInterval(async () => {
                     if (!isLive) return;
                     try {
