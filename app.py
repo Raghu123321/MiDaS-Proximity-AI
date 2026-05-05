@@ -1,7 +1,7 @@
-import os
 import cv2
 import numpy as np
 import torch
+import gc
 import requests
 from flask import Flask, render_template, Response, send_from_directory, request, jsonify
 import run 
@@ -62,6 +62,8 @@ def get_live_model():
             device, WEIGHTS_PATH, "midas_v21_small_256", optimize=False
         )
         live_model.eval()
+        # Aggressive memory cleanup after loading
+        gc.collect()
     return live_model, live_transform
 
 @app.route('/')
@@ -155,7 +157,7 @@ def process_single_frame(frame, model, transform):
     img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0
     img_input = transform({"image": img})["image"]
 
-    with torch.no_grad():
+    with torch.inference_mode():
         sample = torch.from_numpy(img_input).unsqueeze(0)
         prediction = model.forward(sample).squeeze().cpu().numpy()
         prediction = cv2.resize(prediction, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_LINEAR)
@@ -224,7 +226,7 @@ def generate_frames():
             img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0
             img_input = transform({"image": img})["image"]
 
-            with torch.no_grad():
+            with torch.inference_mode():
                 sample = torch.from_numpy(img_input).unsqueeze(0)
                 prediction = model.forward(sample).squeeze().cpu().numpy()
                 prediction = cv2.resize(prediction, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_LINEAR)
