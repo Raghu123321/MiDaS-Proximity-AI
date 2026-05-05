@@ -341,6 +341,7 @@
                     <img id="live-feed" src="" alt="Live Feed" style="width: 100%; border-radius: 20px;">
                     <div class="live-controls">
                         <button class="btn-primary" id="toggle-live">Start Live Stream</button>
+                        <div id="live-status" style="margin-top: 1rem; font-size: 0.9rem; color: var(--primary);">System Ready</div>
                     </div>
                 </div>
 
@@ -376,11 +377,17 @@
         const beepToggle = document.getElementById('beep-toggle');
         const sensitivityInput = document.getElementById('sensitivity');
         const sensitivityVal = document.getElementById('sensitivity-val');
+        const liveStatus = document.getElementById('live-status');
         
         let isLive = false;
         let audioCtx = null;
         let proximityInterval = null;
         let liveMode = 'server'; 
+
+        function updateStatus(msg, color = 'var(--primary)') {
+            liveStatus.innerText = msg;
+            liveStatus.style.color = color;
+        }
 
         // Audio Synthesis Function
         function playBeep(frequency = 440, duration = 0.1) {
@@ -428,11 +435,16 @@
 
         async function startLive() {
             isLive = true;
+            updateStatus("🎥 Requesting Camera Permissions...");
             toggleLiveBtn.innerText = 'Stop Live Stream';
             toggleLiveBtn.style.background = '#ef4444';
 
             try {
-                toggleLiveBtn.innerText = '🎥 Connecting Camera...';
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Your browser does not support camera access or you are not using HTTPS.");
+                }
+
+                toggleLiveBtn.innerText = '🎥 Connecting...';
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { width: { ideal: 480 }, height: { ideal: 360 } } 
                 });
@@ -440,8 +452,9 @@
                 
                 const video = document.createElement('video');
                 video.srcObject = stream;
-                video.setAttribute('playsinline', ''); // Required for iOS
+                video.setAttribute('playsinline', ''); 
                 await video.play();
+                updateStatus("✅ Camera Connected. Starting AI...", "#10b981");
                 toggleLiveBtn.innerText = '🔴 Stop Live Stream';
                 
                 const canvas = document.createElement('canvas');
@@ -461,6 +474,7 @@
                         formData.append('image', blob, 'frame.jpg');
                         
                         try {
+                            updateStatus("🧠 AI Processing...", "#6366f1");
                             const res = await fetch('/api/process_frame', { method: 'POST', body: formData });
                             if (!res.ok) throw new Error("Processing error");
                             const data = await res.json();
@@ -471,6 +485,7 @@
                                 if (beepToggle.checked && data.depth > threshold) {
                                     playBeep(880, 0.15);
                                 }
+                                updateStatus("🟢 Live AI Active", "#10b981");
                             }
                         } catch (e) { 
                             console.error("Frame processing failed", e);
@@ -483,7 +498,8 @@
 
             } catch (err) {
                 console.error("Camera Access Error:", err);
-                alert("Camera Access Denied or Unavailable. Please ensure you have granted camera permissions and are using HTTPS.");
+                updateStatus("❌ Error: " + err.message, "#ef4444");
+                alert("Camera Access Denied or Unavailable. " + err.message);
                 
                 console.log("Falling back to server capture (Local Dev only)");
                 liveMode = 'server';
@@ -492,6 +508,7 @@
                 proximityInterval = setInterval(async () => {
                     if (!isLive) return;
                     try {
+                        updateStatus("📡 Polling Server...", "var(--text-muted)");
                         const response = await fetch('/api/proximity');
                         const data = await response.json();
                         const threshold = parseFloat(sensitivityInput.value);
@@ -499,14 +516,16 @@
                         if (beepToggle.checked && data.depth > threshold) {
                             playBeep(880, 0.15);
                         }
+                        updateStatus("🟢 Server Mode Active", "#10b981");
                     } catch (e) {
-                        console.error("Proximity fetch error", e);
+                        updateStatus("📡 Server Offline", "#ef4444");
                     }
                 }, 300);
             }
         }
 
         function stopLive() {
+            updateStatus("System Ready");
             liveFeed.src = '';
             toggleLiveBtn.innerText = 'Start Live Stream';
             toggleLiveBtn.style.background = 'var(--primary)';
