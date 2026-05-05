@@ -188,30 +188,40 @@ def process_single_frame(frame, model, transform):
 @app.route('/api/process_frame', methods=['POST'])
 def api_process_frame():
     global latest_depth
-    if 'image' not in request.files:
-        return jsonify({"error": "No image uploaded"}), 400
-    
-    model, transform = get_live_model()
-    file = request.files['image']
-    nparr = np.frombuffer(file.read(), np.uint8)
-    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    
-    depth_score, depth_vis = process_single_frame(frame, model, transform)
-    latest_depth = depth_score
-    
-    # Add UI indicators to the frame
-    h, w = frame.shape[:2]
-    cv2.drawMarker(frame, (w//2, h//2), (0, 255, 255), cv2.MARKER_TILTED_CROSS, 30, 2)
-    u_text = f"Depth: {depth_score:.2f} U"
-    cv2.putText(frame, u_text, (w//2 - 90, h//2 + 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 4)
-    cv2.putText(frame, u_text, (w//2 - 90, h//2 + 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+    try:
+        model, transform = get_live_model()
+        file = request.files['image']
+        nparr = np.frombuffer(file.read(), np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return jsonify({"error": "Failed to decode image"}), 400
+            
+        depth_score, depth_vis = process_single_frame(frame, model, transform)
+        latest_depth = depth_score
+        
+        # Add UI indicators to the frame
+        h, w = frame.shape[:2]
+        cv2.drawMarker(frame, (w//2, h//2), (0, 255, 255), cv2.MARKER_TILTED_CROSS, 30, 2)
+        u_text = f"Depth: {depth_score:.2f} U"
+        cv2.putText(frame, u_text, (w//2 - 90, h//2 + 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 4)
+        cv2.putText(frame, u_text, (w//2 - 90, h//2 + 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
 
-    combined = np.concatenate((frame, depth_vis), axis=1)
-    _, buffer = cv2.imencode('.jpg', combined, [cv2.IMWRITE_JPEG_QUALITY, 80])
-    
-    import base64
-    img_str = base64.b64encode(buffer).decode('utf-8')
-    return jsonify({"image": img_str, "depth": float(depth_score)})
+        combined = np.concatenate((frame, depth_vis), axis=1)
+        _, buffer = cv2.imencode('.jpg', combined, [cv2.IMWRITE_JPEG_QUALITY, 70]) # Reduced quality for speed
+        
+        import base64
+        img_str = base64.b64encode(buffer).decode('utf-8')
+        
+        # Explicitly clear some memory
+        del frame, depth_vis, combined, buffer
+        
+        return jsonify({"image": img_str, "depth": float(depth_score)})
+    except Exception as e:
+        import traceback
+        print(f"API Error: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
 
 def generate_frames():
     global latest_depth

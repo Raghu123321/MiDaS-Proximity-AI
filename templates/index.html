@@ -460,23 +460,31 @@
                 const canvas = document.createElement('canvas');
                 canvas.width = 480;
                 canvas.height = 360;
-                const ctx = canvas.getContext('2d');
-
+                let isProcessing = false;
                 const captureLoop = async () => {
                     if (!isLive) {
                         stream.getTracks().forEach(t => t.stop());
                         return;
                     }
                     
+                    if (isProcessing) {
+                        setTimeout(captureLoop, 100);
+                        return;
+                    }
+
                     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                     canvas.toBlob(async (blob) => {
                         const formData = new FormData();
                         formData.append('image', blob, 'frame.jpg');
                         
                         try {
+                            isProcessing = true;
                             updateStatus("🧠 AI Processing...", "#6366f1");
                             const res = await fetch('/api/process_frame', { method: 'POST', body: formData });
-                            if (!res.ok) throw new Error("Processing error");
+                            if (!res.ok) {
+                                const errData = await res.json();
+                                throw new Error(errData.error || "Processing error");
+                            }
                             const data = await res.json();
                             
                             if (data.image) {
@@ -489,9 +497,12 @@
                             }
                         } catch (e) { 
                             console.error("Frame processing failed", e);
+                            updateStatus("⚠️ AI Lagging: " + e.message, "#f59e0b");
+                        } finally {
+                            isProcessing = false;
                         }
                         
-                        if (isLive) setTimeout(captureLoop, 150);
+                        if (isLive) setTimeout(captureLoop, 800); // Increased delay for free tier stability
                     }, 'image/jpeg', 0.6);
                 };
                 captureLoop();
