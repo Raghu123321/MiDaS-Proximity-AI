@@ -60,6 +60,47 @@ def get_proximity():
     global latest_depth
     return {"depth": float(latest_depth)}
 
+@app.route('/api/upload', methods=['POST'])
+def upload_file():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    # Save original
+    original_path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(original_path)
+    
+    # Process
+    model, transform = get_live_model()
+    frame = cv2.imread(original_path)
+    if frame is None:
+        return jsonify({"error": "Invalid image format"}), 400
+    
+    _, depth_vis = process_single_frame(frame, model, transform)
+    
+    # Save depth
+    depth_filename = "depth_" + file.filename
+    depth_path = os.path.join(OUTPUT_FOLDER, depth_filename)
+    cv2.imwrite(depth_path, depth_vis)
+    
+    return jsonify({"success": True, "original": file.filename, "depth": depth_filename})
+
+@app.route('/api/gallery')
+def get_gallery():
+    try:
+        files = os.listdir(OUTPUT_FOLDER)
+        gallery = []
+        for f in files:
+            if f.startswith("depth_"):
+                original = f.replace("depth_", "")
+                if os.path.exists(os.path.join(UPLOAD_FOLDER, original)):
+                    gallery.append({"original": original, "depth": f})
+        return jsonify(gallery[::-1]) # Show latest first
+    except Exception as e:
+        return jsonify([])
+
 def process_single_frame(frame, model, transform):
     global latest_depth
     img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0

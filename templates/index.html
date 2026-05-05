@@ -431,14 +431,17 @@
             toggleLiveBtn.innerText = 'Stop Live Stream';
             toggleLiveBtn.style.background = '#ef4444';
 
-            try {
-                // 1. Try Browser Camera (Required for Render/Cloud)
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 480, height: 360 } });
+                toggleLiveBtn.innerText = '🎥 Connecting Camera...';
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: { ideal: 480 }, height: { ideal: 360 } } 
+                });
                 liveMode = 'browser';
                 
                 const video = document.createElement('video');
                 video.srcObject = stream;
+                video.setAttribute('playsinline', ''); // Required for iOS
                 await video.play();
+                toggleLiveBtn.innerText = '🔴 Stop Live Stream';
                 
                 const canvas = document.createElement('canvas');
                 canvas.width = 480;
@@ -478,7 +481,10 @@
                 captureLoop();
 
             } catch (err) {
-                console.log("Browser camera unavailable, falling back to server capture (Local Dev only)");
+                console.error("Camera Access Error:", err);
+                alert("Camera Access Denied or Unavailable. Please ensure you have granted camera permissions and are using HTTPS.");
+                
+                console.log("Falling back to server capture (Local Dev only)");
                 liveMode = 'server';
                 liveFeed.src = '/video_feed';
 
