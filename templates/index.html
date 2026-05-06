@@ -473,9 +473,9 @@
                 btn.classList.toggle('active', btn.innerText.toLowerCase().includes(tab));
             });
 
-            if (tab === 'live' && !isLive) {
-                startLive();
-            } else if (tab !== 'live' && isLive) {
+            if (tab === 'live') {
+                if (!isLive) startLive();
+            } else if (isLive) {
                 stopLive();
             }
         }
@@ -670,6 +670,14 @@
 
         // Initial Load
         loadGallery();
+        
+        // Auto-detect current tab on load
+        window.onload = () => {
+            const activeTab = document.querySelector('.tab-btn.active');
+            if (activeTab && activeTab.innerText.toLowerCase().includes('live')) {
+                showTab('live');
+            }
+        };
 
         // Drag and Drop Support
         const dropZone = document.querySelector('.upload-section');
