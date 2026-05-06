@@ -294,9 +294,44 @@
             accent-color: var(--primary);
         }
 
-        .help-text {
-            font-size: 0.8rem;
+        .status-dashboard {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            border: 1px solid var(--glass-border);
+            text-align: left;
+        }
+
+        .log-area {
+            height: 100px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem;
+            font-family: monospace;
+            font-size: 0.75rem;
+            color: #10b981;
+            margin-top: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-entry {
+            margin-bottom: 2px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .device-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
             color: var(--text-muted);
+        }
+
+        .device-name {
+            color: var(--primary);
+            font-weight: 600;
         }
 
     </style>
@@ -355,11 +390,21 @@
                         <input type="checkbox" id="beep-toggle" style="width: auto;">
                     </div>
                     <div class="control-group">
-                        <label>Sensitivity (Higher = Needs to be closer):</label>
+                        <label>Sensitivity:</label>
                         <input type="range" id="sensitivity" min="0.1" max="0.95" step="0.05" value="0.8">
                         <span id="sensitivity-val">0.80</span>
                     </div>
-                    <p class="help-text">When the center depth exceeds this value, a beep will sound.</p>
+                </div>
+
+                <div class="status-dashboard">
+                    <div class="panel-header">🖥️ System Dashboard</div>
+                    <div class="device-info">
+                        <span>Detected Camera:</span>
+                        <span class="device-name" id="camera-name">Searching...</span>
+                    </div>
+                    <div class="log-area" id="system-log">
+                        <div class="log-entry">> Initializing system...</div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -381,15 +426,21 @@
         const sensitivityInput = document.getElementById('sensitivity');
         const sensitivityVal = document.getElementById('sensitivity-val');
         const liveStatus = document.getElementById('live-status');
+        const cameraNameDisplay = document.getElementById('camera-name');
+        const systemLog = document.getElementById('system-log');
         
-        let isLive = false;
-        let audioCtx = null;
-        let proximityInterval = null;
-        let liveMode = 'server'; 
+        function addLog(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = `> [${new Date().toLocaleTimeString()}] ${msg}`;
+            systemLog.prepend(entry);
+            if (systemLog.childNodes.length > 20) systemLog.removeChild(systemLog.lastChild);
+        }
 
         function updateStatus(msg, color = 'var(--primary)') {
             liveStatus.innerText = msg;
             liveStatus.style.color = color;
+            addLog(msg);
         }
 
         // Audio Synthesis Function
@@ -457,6 +508,13 @@
                 video.srcObject = stream;
                 video.setAttribute('playsinline', ''); 
                 await video.play();
+                
+                // Extract camera name
+                const tracks = stream.getVideoTracks();
+                if (tracks.length > 0) {
+                    cameraNameDisplay.innerText = tracks[0].label || "Generic Camera";
+                }
+
                 updateStatus("✅ Camera Connected. Starting AI...", "#10b981");
                 toggleLiveBtn.innerText = '🔴 Stop Live Stream';
                 
