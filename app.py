@@ -1,17 +1,11 @@
 import os
-import cv2
-import numpy as np
-import torch
 import gc
 import requests
 from flask import Flask, render_template, Response, send_from_directory, request, jsonify
-import run 
-from supabase import create_client, Client
+# Heavy imports moved inside functions to prevent startup timeout
 
 # Optimization for Low-RAM environments (Render Free Tier)
-torch.set_num_threads(1)
-if hasattr(torch, 'set_num_interop_threads'):
-    torch.set_num_interop_threads(1)
+# Will be applied inside get_live_model
 
 app = Flask(__name__)
 
@@ -32,6 +26,7 @@ BUCKET_NAME = "3d_mapps"
 
 supabase = None
 try:
+    from supabase import create_client, Client
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
     print(f"Supabase init warning: {e}")
@@ -56,6 +51,12 @@ latest_depth = 0.0 # Global to track proximity
 
 def get_live_model():
     global live_model, live_transform
+    import torch
+    import run
+    
+    # Optimization for Low-RAM
+    torch.set_num_threads(1)
+    
     if live_model is None:
         download_weights()
         device = torch.device("cpu")
@@ -63,7 +64,6 @@ def get_live_model():
             device, WEIGHTS_PATH, "midas_v21_small_256", optimize=False
         )
         live_model.eval()
-        # Aggressive memory cleanup after loading
         gc.collect()
     return live_model, live_transform
 
@@ -110,6 +110,7 @@ def upload_file():
             print(f"Supabase upload error (original): {e}")
     
     # Process
+    import cv2
     model, transform = get_live_model()
     frame = cv2.imread(original_path)
     if frame is None:
@@ -165,6 +166,9 @@ def get_gallery():
         return jsonify([])
 
 def process_single_frame(frame, model, transform):
+    import cv2
+    import torch
+    import numpy as np
     global latest_depth
     img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) / 255.0
     img_input = transform({"image": img})["image"]
@@ -189,6 +193,8 @@ def process_single_frame(frame, model, transform):
 def api_process_frame():
     global latest_depth
     try:
+        import cv2
+        import numpy as np
         model, transform = get_live_model()
         file = request.files['image']
         nparr = np.frombuffer(file.read(), np.uint8)
