@@ -597,8 +597,6 @@
         function stopLive() {
             updateStatus("System Ready");
             liveFeed.src = '';
-            toggleLiveBtn.innerText = 'Start Live Stream';
-            toggleLiveBtn.style.background = 'var(--primary)';
             isLive = false;
             
             if (proximityInterval) {
