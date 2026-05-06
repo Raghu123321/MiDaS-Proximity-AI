@@ -444,6 +444,7 @@
             liveStatus.innerText = msg;
             liveStatus.style.color = color;
             addLog(msg);
+            console.log(`[Status] ${msg}`);
         }
 
         // Audio Synthesis Function
@@ -493,14 +494,24 @@
 
             try {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("Your browser does not support camera access or you are not using HTTPS.");
+                    throw new Error("Browser doesn't support camera or not using HTTPS/Localhost.");
                 }
 
-                updateStatus("🎥 Connecting to Camera...");
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: { ideal: 320 }, height: { ideal: 240 } } 
-                });
+                updateStatus("🔍 Searching for camera...");
+                let stream;
+                try {
+                    // Try preferred resolution
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { width: { ideal: 320 }, height: { ideal: 240 } } 
+                    });
+                } catch (e) {
+                    addLog("⚠️ High-res failed, trying generic mode...");
+                    // Fallback to any video
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                }
+                
                 liveMode = 'browser';
+                updateStatus("🎥 Camera found. Connecting stream...");
                 
                 const video = document.createElement('video');
                 video.srcObject = stream;
@@ -510,7 +521,9 @@
                 // Extract camera name
                 const tracks = stream.getVideoTracks();
                 if (tracks.length > 0) {
-                    cameraNameDisplay.innerText = tracks[0].label || "Generic Camera";
+                    const label = tracks[0].label || "Generic Camera";
+                    cameraNameDisplay.innerText = label;
+                    addLog(`📸 Using: ${label}`);
                 }
 
                 updateStatus("✅ Camera Connected. Starting AI...", "#10b981");
