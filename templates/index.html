@@ -262,6 +262,9 @@
             border-radius: 20px;
             overflow: hidden;
             border: 2px solid var(--glass-border);
+            max-width: 640px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .calibration-panel {
@@ -446,7 +449,7 @@
 
                 toggleLiveBtn.innerText = '🎥 Connecting...';
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: { ideal: 480 }, height: { ideal: 360 } } 
+                    video: { width: { ideal: 320 }, height: { ideal: 240 } } 
                 });
                 liveMode = 'browser';
                 
@@ -458,8 +461,8 @@
                 toggleLiveBtn.innerText = '🔴 Stop Live Stream';
                 
                 const canvas = document.createElement('canvas');
-                canvas.width = 480;
-                canvas.height = 360;
+                canvas.width = 320;
+                canvas.height = 240;
                 let isProcessing = false;
                 const captureLoop = async () => {
                     if (!isLive) {

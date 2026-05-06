@@ -220,10 +220,15 @@ def api_process_frame():
     except Exception as e:
         import traceback
         print(f"API Error: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
+        gc.collect() # Try to recover memory
+        return jsonify({"error": str(e)}), 500
 
 def generate_frames():
+    # Server-side camera is disabled on cloud/Render to save memory
+    if os.environ.get('RENDER') or os.environ.get('PORT'):
+        print("Server-side camera disabled in cloud environment.")
+        return
+        
     global latest_depth
     model, transform = get_live_model()
     cap = cv2.VideoCapture(0)
