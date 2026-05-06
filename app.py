@@ -191,10 +191,12 @@ def process_single_frame(frame, model, transform):
 
 @app.route('/api/process_frame', methods=['POST'])
 def api_process_frame():
+    print("--- Received Frame from Browser ---")
     global latest_depth
     try:
         import cv2
         import numpy as np
+        import torch
         model, transform = get_live_model()
         file = request.files['image']
         nparr = np.frombuffer(file.read(), np.uint8)
@@ -301,4 +303,5 @@ def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, threaded=True)
+    # Enabled debug=True to see the exact error in your terminal
+    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
