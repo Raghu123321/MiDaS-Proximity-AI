@@ -378,7 +378,6 @@
                 <div class="live-video-wrapper">
                     <img id="live-feed" src="" alt="Live Feed" style="width: 100%; border-radius: 20px;">
                     <div class="live-controls">
-                        <button class="btn-primary" id="toggle-live">Start Live Stream</button>
                         <div id="live-status" style="margin-top: 1rem; font-size: 0.9rem; color: var(--primary);">System Ready</div>
                     </div>
                 </div>
@@ -474,24 +473,19 @@
                 btn.classList.toggle('active', btn.innerText.toLowerCase().includes(tab));
             });
 
-            if (tab !== 'live' && isLive) {
+            if (tab === 'live' && !isLive) {
+                startLive();
+            } else if (tab !== 'live' && isLive) {
                 stopLive();
             }
         }
 
-        toggleLiveBtn.addEventListener('click', () => {
-            if (!isLive) {
-                startLive();
-            } else {
-                stopLive();
-            }
-        });
+        // Manual toggle removed for auto-start logic in showTab
 
         async function startLive() {
+            if (isLive) return;
             isLive = true;
-            updateStatus("🎥 Requesting Camera Permissions...");
-            toggleLiveBtn.innerText = 'Stop Live Stream';
-            toggleLiveBtn.style.background = '#ef4444';
+            updateStatus("🎥 Initializing Camera...");
 
             try {
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
