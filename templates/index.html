@@ -379,6 +379,7 @@
                     <img id="live-feed" src="" alt="Live Feed" style="width: 100%; border-radius: 20px;">
                     <div class="live-controls">
                         <div id="live-status" style="margin-top: 1rem; font-size: 0.9rem; color: var(--primary);">System Ready</div>
+                        <button class="btn-primary" id="capture-btn" style="background: #10b981; margin-top: 1rem; display: none;">📸 Capture AI Photo</button>
                     </div>
                 </div>
 
@@ -423,6 +424,7 @@
         const liveStatus = document.getElementById('live-status');
         const cameraNameDisplay = document.getElementById('camera-name');
         const systemLog = document.getElementById('system-log');
+        const captureBtn = document.getElementById('capture-btn');
         const beepToggle = document.getElementById('beep-toggle');
         const sensitivityInput = document.getElementById('sensitivity');
         const sensitivityVal = document.getElementById('sensitivity-val');
@@ -527,6 +529,7 @@
                 }
 
                 updateStatus("✅ Camera Connected. Starting AI...", "#10b981");
+                captureBtn.style.display = 'inline-block';
                 
                 const canvas = document.createElement('canvas');
                 canvas.width = 320;
@@ -622,8 +625,7 @@
         function stopLive() {
             updateStatus("System Ready");
             liveFeed.src = '';
-            toggleLiveBtn.innerText = 'Start Live Stream';
-            toggleLiveBtn.style.background = 'var(--primary)';
+            captureBtn.style.display = 'none';
             isLive = false;
             
             if (proximityInterval) {
@@ -631,6 +633,28 @@
                 proximityInterval = null;
             }
         }
+
+        // Capture Live Image
+        captureBtn.addEventListener('click', async () => {
+            if (!isLive) return;
+            addLog("📸 Capturing AI result...");
+            try {
+                const res = await fetch('/api/capture_live', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: liveFeed.src })
+                });
+                if (res.ok) {
+                    addLog("✅ Snapshot saved to gallery!");
+                    loadGallery();
+                    // Visual feedback
+                    captureBtn.innerText = "✅ Saved!";
+                    setTimeout(() => captureBtn.innerText = "📸 Capture AI Photo", 2000);
+                }
+            } catch (e) {
+                addLog("❌ Capture failed");
+            }
+        });
 
         // Handle File Selection
         fileInput.addEventListener('change', async (e) => {

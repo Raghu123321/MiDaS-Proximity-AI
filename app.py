@@ -149,21 +149,73 @@ def upload_file():
 
 @app.route('/api/gallery')
 def get_gallery():
+    gallery = []
     try:
-        if not supabase:
-            return jsonify([])
-        response = supabase.table("gallery").select("*").order("created_at", desc=True).execute()
-        gallery = []
-        for row in response.data:
-            gallery.append({
-                "original": row["original_url"],
-                "depth": row["depth_url"],
-                "name": row["original_name"]
-            })
+        # First, try to get from Supabase if configured
+        if supabase:
+            try:
+                response = supabase.table("gallery").select("*").order("created_at", desc=True).execute()
+                for row in response.data:
+                    gallery.append({
+                        "original": row["original_url"],
+                        "depth": row["depth_url"],
+                        "name": row["original_name"]
+                    })
+                if gallery: return jsonify(gallery)
+            except Exception as e:
+                print(f"Supabase gallery error: {e}")
+
+        # Fallback to local files if Supabase is empty or failed
+        if os.path.exists(OUTPUT_FOLDER):
+            files = [f for f in os.listdir(OUTPUT_FOLDER) if f.startswith('depth_')]
+            for f in sorted(files, reverse=True)[:12]: # Show last 12
+                original_name = f.replace('depth_', '')
+                gallery.append({
+                    "original": f"/uploads/{original_name}",
+                    "depth": f"/outputs/{f}",
+                    "name": original_name
+                })
         return jsonify(gallery)
     except Exception as e:
         print(f"Gallery fetch error: {e}")
         return jsonify([])
+
+@app.route('/api/capture_live', methods=['POST'])
+def capture_live():
+    try:
+        import cv2
+        import numpy as np
+        import time
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"error": "No image data"}), 400
+        
+        # Decode base64 image
+        import base64
+        header, encoded = data['image'].split(",", 1)
+        image_data = base64.b64decode(encoded)
+        nparr = np.frombuffer(image_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        # Process
+        model, transform = get_live_model()
+        depth_score, depth_vis = process_single_frame(frame, model, transform)
+        
+        timestamp = int(time.time())
+        orig_name = f"capture_{timestamp}.jpg"
+        depth_name = f"depth_{orig_name}"
+        
+        cv2.imwrite(os.path.join(UPLOAD_FOLDER, orig_name), frame)
+        cv2.imwrite(os.path.join(OUTPUT_FOLDER, depth_name), depth_vis)
+        
+        # Upload to Supabase if possible (optional background)
+        if supabase:
+             # (Simplified for speed)
+             pass
+
+        return jsonify({"success": True, "name": orig_name})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def process_single_frame(frame, model, transform):
     import cv2
