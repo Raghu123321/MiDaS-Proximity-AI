@@ -420,13 +420,17 @@
         const loadingOverlay = document.getElementById('loading-overlay');
         const galleryGrid = document.getElementById('gallery-grid');
         const liveFeed = document.getElementById('live-feed');
-        const toggleLiveBtn = document.getElementById('toggle-live');
-        const beepToggle = document.getElementById('beep-toggle');
-        const sensitivityInput = document.getElementById('sensitivity');
-        const sensitivityVal = document.getElementById('sensitivity-val');
         const liveStatus = document.getElementById('live-status');
         const cameraNameDisplay = document.getElementById('camera-name');
         const systemLog = document.getElementById('system-log');
+        const beepToggle = document.getElementById('beep-toggle');
+        const sensitivityInput = document.getElementById('sensitivity');
+        const sensitivityVal = document.getElementById('sensitivity-val');
+        
+        let isLive = false;
+        let audioCtx = null;
+        let proximityInterval = null;
+        let liveMode = 'server'; 
         
         function addLog(msg) {
             const entry = document.createElement('div');
@@ -492,7 +496,7 @@
                     throw new Error("Your browser does not support camera access or you are not using HTTPS.");
                 }
 
-                toggleLiveBtn.innerText = '🎥 Connecting...';
+                updateStatus("🎥 Connecting to Camera...");
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { width: { ideal: 320 }, height: { ideal: 240 } } 
                 });
@@ -510,7 +514,6 @@
                 }
 
                 updateStatus("✅ Camera Connected. Starting AI...", "#10b981");
-                toggleLiveBtn.innerText = '🔴 Stop Live Stream';
                 
                 const canvas = document.createElement('canvas');
                 canvas.width = 320;
